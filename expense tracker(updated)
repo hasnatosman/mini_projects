@@ -1,0 +1,141 @@
+import sqlite3
+
+def initialize_db():
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+
+    # Create table for expenses
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT,
+            category TEXT,
+            description TEXT,
+            amount REAL
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+    print("Database initialized successfully.")
+
+initialize_db()
+
+class ExpenseTracker:
+    def __init__(self):
+        self.conn = sqlite3.connect('db.sqlite')
+        self.cursor = self.conn.cursor()
+
+    def add_expense(self, date, category, description, amount):
+        self.cursor.execute('''
+            INSERT INTO expenses (date, category, description, amount)
+            VALUES (?, ?, ?, ?)
+        ''', (date, category, description, amount))
+        self.conn.commit()
+        print("Expense added successfully.")
+
+    def view_expenses(self, filter_by=None):
+        query = "SELECT * FROM expenses"
+        if filter_by == "category":
+            category = input("Enter category to filter by: ")
+            query += " WHERE category = ?"
+            self.cursor.execute(query, (category,))
+        elif filter_by == "date":
+            date = input("Enter date (YYYY-MM-DD) to filter by: ")
+            query += " WHERE date = ?"
+            self.cursor.execute(query, (date,))
+        else:
+            self.cursor.execute(query)
+
+        expenses = self.cursor.fetchall()
+        print("\nExpenses:")
+        for expense in expenses:
+            print(f"ID: {expense[0]}, Date: {expense[1]}, Category: {expense[2]}, Description: {expense[3]}, Amount: {expense[4]}")
+
+    def monthly_summary(self, month):
+        self.cursor.execute('''
+            SELECT category, SUM(amount) as total
+            FROM expenses
+            WHERE strftime('%m', date) = ?
+            GROUP BY category
+        ''', (month,))
+        summary = self.cursor.fetchall()
+        print("\nMonthly Summary:")
+        for row in summary:
+            print(f"Category: {row[0]}, Total Spent: ${row[1]:.2f}")
+        return summary
+
+    def export_to_csv(self, filename):
+        import csv
+        self.cursor.execute("SELECT * FROM expenses")
+        expenses = self.cursor.fetchall()
+
+        with open(filename, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['ID', 'Date', 'Category', 'Description', 'Amount'])
+            writer.writerows(expenses)
+        print(f"Data exported to {filename} successfully.")
+
+
+import matplotlib.pyplot as plt
+
+def plot_monthly_summary(summary):
+    categories = [row[0] for row in summary]
+    totals = [row[1] for row in summary]
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(categories, totals, color='skyblue')
+    plt.title("Monthly Expense Summary")
+    plt.xlabel("Category")
+    plt.ylabel("Total Amount ($)")
+    plt.show()
+
+def main():
+    tracker = ExpenseTracker()
+
+    while True:
+        print("\n--- Personal Expense Tracker ---")
+        print("1. Add Expense")
+        print("2. View Expenses")
+        print("3. Monthly Summary")
+        print("4. Export to CSV")
+        print("5. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            date = input("Enter date (YYYY-MM-DD): ")
+            category = input("Enter category (e.g., Food, Travel): ")
+            description = input("Enter description: ")
+            amount = float(input("Enter amount: "))
+            tracker.add_expense(date, category, description, amount)
+
+        elif choice == '2':
+            print("1. View All")
+            print("2. Filter by Category")
+            print("3. Filter by Date")
+            filter_choice = input("Choose a filter option: ")
+            if filter_choice == '2':
+                tracker.view_expenses(filter_by="category")
+            elif filter_choice == '3':
+                tracker.view_expenses(filter_by="date")
+            else:
+                tracker.view_expenses()
+
+        elif choice == '3':
+            month = input("Enter month (MM): ")
+            summary = tracker.monthly_summary(month)
+            plot_monthly_summary(summary)
+
+        elif choice == '4':
+            filename = input("Enter filename (e.g., expenses.csv): ")
+            tracker.export_to_csv(filename)
+
+        elif choice == '5':
+            print("Exiting. Goodbye!")
+            break
+
+        else:
+            print("Invalid choice. Please try again.")
+
+if __name__ == '__main__':
+    main()
