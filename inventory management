@@ -1,0 +1,153 @@
+# database ................................................................
+import sqlite3
+
+def initialize_db():
+    conn = sqlite3.connect('db.sqlite')
+    cursor = conn.cursor()
+
+    # Create table for inventory
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            quantity INTEGER,
+            price REAL
+        )
+    ''')
+
+    conn.commit()
+    conn.close()
+    print("Database initialized successfully.")
+
+initialize_db()
+
+# inventory....................................................
+
+class InventoryManager:
+    def __init__(self):
+        self.conn = sqlite3.connect('db.sqlite')
+        self.cursor = self.conn.cursor()
+
+    def add_item(self, name, quantity, price):
+        self.cursor.execute('''
+            INSERT INTO inventory (name, quantity, price)
+            VALUES (?, ?, ?)
+        ''', (name, quantity, price))
+        self.conn.commit()
+        print(f"Item '{name}' added successfully!")
+
+    def update_item(self, item_id, quantity, price):
+        self.cursor.execute('''
+            UPDATE inventory
+            SET quantity = ?, price = ?
+            WHERE id = ?
+        ''', (quantity, price, item_id))
+        self.conn.commit()
+        print(f"Item with ID {item_id} updated successfully!")
+
+    def remove_item(self, item_id):
+        self.cursor.execute('DELETE FROM inventory WHERE id = ?', (item_id,))
+        self.conn.commit()
+        print(f"Item with ID {item_id} removed successfully!")
+
+    def view_inventory(self):
+        self.cursor.execute('SELECT * FROM inventory')
+        items = self.cursor.fetchall()
+
+        print("\nCurrent Inventory:")
+        for item in items:
+            print(f"ID: {item[0]}, Name: {item[1]}, Quantity: {item[2]}, Price: ${item[3]:.2f}")
+        return items
+
+    def check_low_stock(self, threshold):
+        self.cursor.execute('SELECT * FROM inventory WHERE quantity < ?', (threshold,))
+        items = self.cursor.fetchall()
+
+        print("\nLow Stock Items:")
+        for item in items:
+            print(f"ID: {item[0]}, Name: {item[1]}, Quantity: {item[2]}")
+        return items
+
+    def export_to_csv(self, filename):
+        import csv
+        self.cursor.execute('SELECT * FROM inventory')
+        items = self.cursor.fetchall()
+
+        with open(filename, 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['ID', 'Name', 'Quantity', 'Price'])
+            writer.writerows(items)
+        print(f"Inventory exported to {filename} successfully.")
+
+# Visualization ...................................................
+import matplotlib.pyplot as plt
+
+def plot_inventory(items):
+    names = [item[1] for item in items]
+    quantities = [item[2] for item in items]
+
+    plt.figure(figsize=(10, 6))
+    plt.bar(names, quantities, color='lightgreen')
+    plt.title("Inventory Stock Levels")
+    plt.xlabel("Items")
+    plt.ylabel("Quantity")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+# Manu Driver CLI ........................................................
+def main():
+    manager = InventoryManager()
+
+    while True:
+        print("\n--- Inventory Management System ---")
+        print("1. Add Item")
+        print("2. Update Item")
+        print("3. Remove Item")
+        print("4. View Inventory")
+        print("5. Check Low Stock")
+        print("6. Export to CSV")
+        print("7. Visualize Inventory")
+        print("8. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == '1':
+            name = input("Enter item name: ")
+            quantity = int(input("Enter item quantity: "))
+            price = float(input("Enter item price: "))
+            manager.add_item(name, quantity, price)
+
+        elif choice == '2':
+            item_id = int(input("Enter item ID: "))
+            quantity = int(input("Enter new quantity: "))
+            price = float(input("Enter new price: "))
+            manager.update_item(item_id, quantity, price)
+
+        elif choice == '3':
+            item_id = int(input("Enter item ID to remove: "))
+            manager.remove_item(item_id)
+
+        elif choice == '4':
+            manager.view_inventory()
+
+        elif choice == '5':
+            threshold = int(input("Enter low stock threshold: "))
+            manager.check_low_stock(threshold)
+
+        elif choice == '6':
+            filename = input("Enter filename (e.g., inventory.csv): ")
+            manager.export_to_csv(filename)
+
+        elif choice == '7':
+            items = manager.view_inventory()
+            plot_inventory(items)
+
+        elif choice == '8':
+            print("Exiting. Goodbye!")
+            break
+
+        else:
+            print("Invalid choice! Please try again.")
+
+if __name__ == '__main__':
+    main()
